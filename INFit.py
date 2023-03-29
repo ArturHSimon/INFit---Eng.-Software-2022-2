@@ -1,14 +1,17 @@
 # %%
 #GUI Libs
 import tkinter as tk
-import tkinter as ttk
 from tkinter import messagebox
-
+import tkinter.simpledialog
+import tkinter.ttk as ttk
+from tkinter import *
 
 #Py/Utils Libs
 from copy import deepcopy
 import pickle
 import itertools
+import os.path
+
 
 
 
@@ -42,13 +45,12 @@ class IndividualClass:
         return f'{self.name} - Dia {self.date} - Preço: R$ {self.price}'
     
     
-class TrainSchedule:
-    def __init__(self, exercises, user):
+class Train:
+    def __init__(self, exercises):
         self.exercises = exercises
-        self.user = user
 
     def __str__(self):
-        return f'Treinos do usuário {self.user}:\n {self.exercises}'
+        return f'{self.exercises}'
     
     
 class Student:
@@ -69,8 +71,8 @@ class Student:
         return False
     
     def purchase_class(self, indiv_class):
-        if self.balance >= indiv_class.price:
-            self.balance -= indiv_class.price
+        if self.balance >= int(indiv_class.price):
+            self.balance -= int(indiv_class.price)
             self.classes.append(indiv_class)
             return True
         return False
@@ -200,7 +202,7 @@ class LoginScreen:
                     student_view = TrainerView(self.master, login.username)
                 if login.login_type == 'manager':
                     student_view = ManagerView(self.master, login.username)
-
+                    # student_view = ManagerView()
                 break
         else:
             self.master.withdraw()
@@ -215,17 +217,28 @@ class StudentView(tk.Toplevel):
         self.first = True
         
         super().__init__(master)
+
+
+        new_student = True
+        for i in list_of_students:
+            if i.name == username:
+                self.user = i
+                new_student = False
+
+        if new_student:
+            self.user = Student(username)
+            list_of_students.append(self.user)
         
-        self.user = Student(username)
         self.controller = StudentController(self.user, self)
         
-        self.geometry("1280x1280")
+        # self.geometry("3000x3000")
         self.title("INFit")
+        
 
         # nome do estudante direita em cima
         username_label = tk.Label(self, text=f"Olá {username}", font=("TkDefaultFont", 12), anchor="e")
         username_label.pack(side="top", fill="x", pady=(10,0))
-        
+
         self.balanceHolder = tk.IntVar()
         self.textBalanceHolder = tk.StringVar()
 
@@ -235,26 +248,54 @@ class StudentView(tk.Toplevel):
         balance_label.pack(side="top", fill="x", pady=(0,0))
 
         # botão para sair
-        quit_button = tk.Button(self, text="Logout", command=self.master.destroy, anchor="e")
-        quit_button.pack(side="right", pady=(0,970))
+        quit_button = tk.Button(self, text="Logout", command=self.close_all, anchor="e")
+        quit_button.pack(side="right", pady=(0,900))
 
         # botão de compra de planos/aula
         purchase_plan_button = tk.Button(self, text="Comprar planos ou aulas", font=("TkDefaultFont", 12), command = self.purchasse_command)
-        purchase_plan_button.pack(side="right", padx=(10, 20), pady=(20, 10))
+        purchase_plan_button.pack(side="right", padx=(10, 20), pady=(50, 10))
 
         update_balance_button = tk.Button(self, text="Adicionar saldo", font=("TkDefaultFont", 12), command = self.update_balance)
-        update_balance_button.pack(side="right", padx=(10, 20), pady=(20, 10))
+        update_balance_button.pack(side="right", padx=(10, 20), pady=(50, 10))
 
         # lista com os planos/aulas que você já têm
         already_purchased_label = tk.Label(self, text="Planos e aulas comprados:", font=("TkDefaultFont", 14), anchor="w")
         already_purchased_label.pack(side="top", fill="x", pady=(40,0))
-        
+
         self.purchased_list = tk.Listbox(self, font=("TkDefaultFont", 12))
         self.purchased_list.pack(side="top", fill = 'x')
+
+
+        self.assigned_trains_canvas = tk.Listbox(self, font=("TkDefaultFont", 12))
+        self.assigned_trains_canvas.pack(side="bottom", fill = 'x')
+
+        assigned_trains_label = tk.Label(self, text="Seus treinos:", font=("TkDefaultFont", 14))
+        assigned_trains_label.pack(side="bottom", fill="x", pady=(40,0))
+
+
+        self.update_purchassed_classes()
+
 
     def update_balance_info(self):
         self.balanceHolder.set(self.controller.get_student_balance())
         self.textBalanceHolder.set("Seu saldo: R$:{}.00".format(self.balanceHolder.get()))
+
+    def update_purchassed_classes(self):
+        for i in self.user.classes:
+            self.purchased_list.insert('end', i)
+
+        for i in self.user.plans:
+            self.purchased_list.insert('end', i)
+
+        for i in self.user.treinos:
+            self.assigned_trains_canvas.insert('end', i)
+
+
+
+    def close_all(self):
+        self.withdraw()
+        self.master.quit()
+        self.master.destroy()
 
     def purchasse_command(self):
         if self.first:
@@ -320,28 +361,33 @@ class StudentView(tk.Toplevel):
         self.update_balance_info()
 
 class ManagerView(tk.Toplevel):
-    def init(self, master, username):
-
+    def __init__(self, master, username):
+        print('rteste')
         self.first = True
 
-        super().init(master)
+        super().__init__(master)
 
         self.controller = ManagerController(self)
-        self.geometry("1280x1280")
+        # self.geometry("1280x1280")
         self.title("INFit - Manager")
 
         # nome do estudante direita em cima
-        username_label = tk.Label(self, text=f"Olá {username}", font=("TkDefaultFont", 12), anchor="e")
+        username_label = tk.Label(self, text=f"Olá Manager {username}", font=("TkDefaultFont", 12), anchor="e")
         username_label.pack(side="top", fill="x", pady=(10, 0))
 
         # botão para sair
-        quit_button = tk.Button(self, text="Logout", command=self.master.destroy, anchor="e")
-        quit_button.pack(side="right", pady=(0, 970))
+        quit_button = tk.Button(self, text="Logout", command=self.close_all, anchor="e")
+        quit_button.pack(side="right", pady=(0,970))
 
         # botão de geração de relatório
         request_report_button = tk.Button(self, text="Gerar relatório dos alunos", font=("TkDefaultFont", 12),
                                         command=self.request_report)
         request_report_button.pack(side="right", padx=(10, 20), pady=(20, 10))
+
+                # botão de geração de relatório financeiro
+        request_financial_report_button = tk.Button(self, text="Gerar relatório  FINANCEIRO dos alunos", font=("TkDefaultFont", 12),
+                                        command=self.request_financial_report)
+        request_financial_report_button.pack(side="right", padx=(50, 20), pady=(50, 10))
 
         # lista com os nomes, valores e planos comprados das compras feitas pelo sistema
         title_report_list = tk.Label(self, text="Relatório de usuários:", font=("TkDefaultFont", 14),
@@ -351,39 +397,177 @@ class ManagerView(tk.Toplevel):
         self.report_list = tk.Listbox(self, font=("TkDefaultFont", 12))
         self.report_list.pack(side="top", fill='x')
 
+
+        financial_title_report_list = tk.Label(self, text="Relatório financeiro:", font=("TkDefaultFont", 14),
+                                           anchor="w")
+        financial_title_report_list.pack(side="bottom", fill="x", pady=(0, 400))
+
+        self.financial_report_list = tk.Listbox(self, font=("TkDefaultFont", 12))
+        self.financial_report_list.pack(side="bottom", fill='x', padx = (250))
+
     def request_report(self):
-        list_users = self.controller.generate_report()
+        list_users = self.controller.get_user_info()
         for user in list_users:
-            self.report_list.insert("end", user.username)
+            self.report_list.insert("end", user.name)
+            self.report_list.insert("end", user.treinos)
+            self.report_list.insert("end", user.plans)
+            self.report_list.insert("end", user.classes)
+            self.report_list.insert("end", ' ')
+            self.report_list.insert("end", ' ')
+    
+    def request_financial_report(self):
+        total_aulas = []
+        total_planos = []
+        list_users = self.controller.get_user_info()
+        self.financial_report_list.insert("end", 'PLANOS')
+        for user in list_users:
+            for plan in user.plans:
+                self.financial_report_list.insert("end", f'R${plan.price}')
+                total_planos.append(plan.price)
+
+        self.financial_report_list.insert("end", f'Total planos: R${sum(total_planos)}')
+
+        self.financial_report_list.insert("end", 'AULAS')
+        for user in list_users:
+            for aula in user.classes:
+                self.financial_report_list.insert("end", f'R${aula.price}')
+                total_aulas.append(aula.price)
+        self.financial_report_list.insert("end", f'Total aulas: R${sum(total_aulas)}')
+        self.financial_report_list.insert("end", '')
+
+        self.financial_report_list.insert("end", f'TOTAL GANHO: R${sum(total_aulas) + sum(total_planos)}')
+
+    def close_all(self):
+        self.withdraw()
+        self.master.quit()
+        self.master.destroy()
 
 class TrainerView(tk.Toplevel):
     def __init__(self, master, username):
         
-        self.first = True
         
         super().__init__(master)
         
         self.controller = TrainerController(self)
         
         self.geometry("1280x1280")
-        self.title("INFit")
+        self.title("INFit - Trainer")
 
         # nome do treinador direita em cima
         username_label = tk.Label(self, text=f"Olá treinador {username}", font=("TkDefaultFont", 12), anchor="e")
         username_label.pack(side="top", fill="x", pady=(10,0))
-        
+
         # botão para sair
-        quit_button = tk.Button(self, text="Logout", command=self.master.destroy, anchor="e")
+        quit_button = tk.Button(self, text="Logout", command=self.close_all, anchor="e")
         quit_button.pack(side="right", pady=(0,970))
 
         # lista com os planos/aulas que você já têm
-        already_purchased_label = tk.Label(self, text="Usuários:", font=("TkDefaultFont", 14), anchor="w")
+        already_purchased_label = tk.Label(self, text="Usuários e informações:", font=("TkDefaultFont", 14), anchor="w")
         already_purchased_label.pack(side="top", fill="x", pady=(40,0))
-        
-        self.purchased_list = tk.Listbox(self, font=("TkDefaultFont", 12))
-        self.purchased_list.pack(side="top", fill = 'x')
 
+        self.canvas = tk.Listbox(self, font=("TkDefaultFont", 12))
+        self.canvas.pack(side="top", fill="x")
+
+        # botão para criar treino
+        create_train_button = tk.Button(self, text="Criar Treino", font=("TkDefaultFont", 12), command=self.create_train)
+        create_train_button.pack(side="left", padx=(20,0), pady=(40,0))
+
+        # botão para verificar treinos existentes
+        check_existing_trains_button = tk.Button(self, text="Verificar Treinos Existentes", font=("TkDefaultFont", 12), command=self.get_trains)
+        check_existing_trains_button.pack(side="left", padx=(20,0), pady=(10,0))
+
+        # botão para verificar aulas existentes
+        check_existing_trains_button = tk.Button(self, text="Verificar Aulas Existentes", font=("TkDefaultFont", 12), command=self.get_classes)
+        check_existing_trains_button.pack(side="left", padx=(20,0), pady=(10,0))
+
+        # botão para alterar os treinos dos usuários
+        change_users_trains_button = tk.Button(self, text="Vincular treino à estudantes", font=("TkDefaultFont", 12), command=self.set_train_to_user)
+        change_users_trains_button.pack(side="left", padx=(20,0), pady=(40,0))
+
+        # botão para ver todos os estudantes
+        get_students_button = tk.Button(self, text="Ver todos os estudantes", font=("TkDefaultFont", 12), command=self.get_all_students)
+        get_students_button.pack(side="left", padx=(20,0), pady=(40,0))
+
+
+        # botão para criar uma aula individual
+        create_individual_class_button = tk.Button(self, text="Criar Aula Individual", font=("TkDefaultFont", 12), command=self.create_class)
+        create_individual_class_button.pack(side="left", padx=(20,0), pady=(40,0))
+
+    def get_trains(self):
+        self.canvas.delete(0, 'end')
+
+        for i in list_of_trains:
+            self.canvas.insert('end', i)
+
+    def get_classes(self):
+        self.canvas.delete(0, 'end')
+
+        for i in list_of_classes:
+            self.canvas.insert('end', i)
+
+    def get_all_students(self):
+        self.canvas.delete(0, 'end')
+
+        for i in list_of_students:
+            self.canvas.insert('end', i.name)
+    
+    def create_train(self):
+        amount = tk.simpledialog.askstring("CRIAR TREINO", "Digite o novo treino: ", parent = self)
+        list_of_trains.append(Train(amount))
+        self.get_trains()
+
+    def create_class(self):
+        name_Train = tk.simpledialog.askstring("CRIAR AULA INDIVIDUAL", "Digite a nova aula: ", parent = self)
+        price_Train = tk.simpledialog.askstring("CRIAR AULA INDIVIDUAL", "Digite o preço: ", parent = self)
+        date_Train = tk.simpledialog.askstring("CRIAR AULA INDIVIDUAL", "Digite a data: ", parent = self)
+        list_of_classes.append(IndividualClass(name_Train, price_Train, date_Train))
+        self.get_classes()
+
+    def set_train_to_user(self):
+        not_found_error = True
+
+        name_Student = tk.simpledialog.askstring("Selecionar estudante", "Digite o nome do estudante: ", parent = self)
+        for i in list_of_students:
+            if i.name == name_Student:
+                chosen_option = show_options(list_of_trains)
+                i.treinos.append(chosen_option)
+                not_found_error = False
+                messagebox.showinfo("Treino registrado", f"O aluno {i.name} foi vinculado ao treino {chosen_option}!")
+
+        if not_found_error:
+            messagebox.showinfo("Aluno não existe", "O nome não se encontra na nossa database!")
+
+
+    def close_all(self):
+        self.withdraw()
+        self.master.quit()
+        self.master.destroy()
+
+class OptionWindow:
+    def __init__(self, options):
+        self.options = options
+        self.choice = None
         
+        self.window = tk.Toplevel()
+        self.window.title("Treinos disponíveis")
+        
+        self.label = tk.Label(self.window, text="Selecione um treino:")
+        self.label.pack(padx=10, pady=10)
+        
+        self.buttons = []
+        for option in options:
+            button = tk.Button(self.window, text=option, command=lambda option=option: self.choose_option(option))
+            button.pack(padx=10, pady=5)
+            self.buttons.append(button)
+    
+    def choose_option(self, option):
+        self.choice = option
+        self.window.destroy()
+
+def show_options(options):
+    option_window = OptionWindow(options)
+    option_window.window.wait_window()
+    return option_window.choice
 
 
     
@@ -457,20 +641,31 @@ class TrainerController:
     def __init__(self, trainer_view):
         self.trainer_view = trainer_view
 
-
-class ManagerController:
-    def init(self, view):
-        self.view = view
-
-    def generate_report(self):
+    def get_user_info(self):
         list_logins = []
         list_users = []
-        with open('logins.bin', 'rb+') as f:
+        with open('users.bin', 'rb+') as f:
             list_logins = pickle.load(f)
 
         for login in list_logins:
-            if (login.login_type == 'user'):
-                list_users.append(login)
+            list_users.append(login)
+
+        return list_users
+
+
+class ManagerController:
+    def __init__(self, view):
+        self.view = view
+
+    def get_user_info(self):
+        list_logins = []
+        list_users = []
+        with open('users.bin', 'rb+') as f:
+            list_logins = pickle.load(f)
+
+        for login in list_logins:
+            list_users.append(login)
+
         return list_users
 
 
@@ -479,33 +674,75 @@ class ManagerController:
 
 
 if __name__ == '__main__':
+    # Define the filenames
+    users_file = 'users.bin'
+    trains_file = 'trains.bin'
+    logins_file = 'logins.bin'
+    plans_file = 'plans.bin'
+    classes_file = 'classes.bin'
 
+    if os.path.isfile(users_file) and os.path.isfile(trains_file) and os.path.isfile(logins_file) and os.path.isfile(plans_file) and os.path.isfile(classes_file):
+        # Load the data from the files if they exist
+        with open(users_file, 'rb') as f:
+            list_of_students = pickle.load(f)
+        with open(trains_file, 'rb') as f:
+            list_of_trains = pickle.load(f)
+        with open(logins_file, 'rb')  as f:
+            users = pickle.load(f)
+        with open(plans_file, 'rb')  as f:
+            list_of_plans = pickle.load(f)
+        with open(classes_file, 'rb')  as f:
+            list_of_classes = pickle.load(f)
+
+    else:
+        users = []
+        list_of_plans = []
+        list_of_classes = []
+        
+        ##Instancio alguns logins de exemplo
+        usernames = ['Artur', 'Arthur', 'Alberto', 'Anderson', 'Thiago']
+        passwords = ['teste', 'teste','teste', 'teste','teste']
+        login_types = ['user', 'user', 'trainer', 'trainer', 'manager']
+
+
+        for i, x, y in zip(usernames, passwords, login_types):
+            users.append(Login(i, x, y))
+
+        list_of_plans.append(Plan("Anual", 1000))
+        list_of_plans.append(Plan("Mensal", 150))
+        list_of_plans.append(Plan("Semanal", 50))
+        list_of_classes.append(IndividualClass('Aula de zumba', 80, '08/02/2023'))
+        list_of_classes.append(IndividualClass('Aula de tango', 100, '09/02/2023'))
+        list_of_classes.append(IndividualClass('Aula de MPB', 90, '09/02/2023'))
+
+        list_of_trains = []
+        list_of_trains.append(Train('Costas - Segunda exercícios 2-4-6-7, Pernas - Quarta exercícios 1-3-12-9, Braço/Peitoral - Sexta excercícios 12-41-3-17-33'))
+        list_of_trains.append(Train('Costas - Segunda e Quarta exercícios 2-4-6-7, Pernas - Terça e Sábado exercícios 1-3-12-9, Braço/Peitoral - Quinta e Sexta excercícios 12-41-3-17-33'))
+
+        list_of_students = []
+        for x, login in enumerate(login_types):
+            if login == 'user':
+                list_of_students.append(Student(usernames[x], balance = x*100, cpf = None, age = 30-x*3, plans = [list_of_plans[x]], classes = [list_of_classes[x]], treinos = [Train(list_of_trains[x])]))
+
+        with open('users.bin', 'wb') as f:
+            pickle.dump(list_of_students, f)
+
+        with open('trains.bin', 'wb') as f:
+            pickle.dump(list_of_trains, f)
+
+        with open('logins.bin', 'wb')  as f:
+            pickle.dump(users, f)
+
+        with open('plans.bin', 'wb')  as f:
+            pickle.dump(list_of_plans, f)
+
+        with open('classes.bin', 'wb')  as f:
+            pickle.dump(list_of_classes, f)
     
-    users = []
-    list_of_plans = []
-    list_of_classes = []
-    
-    ##Instancio alguns logins de exemplo
-    usernames = ['Artur', 'Arthur', 'Alberto', 'Anderson', 'Thiago']
-    passwords = ['teste', 'teste','teste', 'teste','teste']
-    login_types = ['user', 'user', 'trainer', 'trainer', 'manager']
-
-
-    for i, x, y in zip(usernames, passwords, login_types):
-        users.append(Login(i, x, y))
-
-    list_of_plans.append(Plan("Anual", 1000))
-    list_of_plans.append(Plan("Mensal", 150))
-    list_of_plans.append(Plan("Semanal", 50))
-    list_of_classes.append(IndividualClass('Aula de zumba', 80, '08/02/2023'))
-    list_of_classes.append(IndividualClass('Aula de tango', 100, '09/02/2023'))
-    list_of_classes.append(IndividualClass('Aula de MPB', 90, '09/02/2023'))
-
-    list_of_students = []
-
-    for x, login in enumerate(login_types):
-        if login == 'user':
-            list_of_students.append(Student(usernames[x], balance = 0, cpf = None, age = 30, plans = [Plan("Anual", 1000)], classes = [IndividualClass('Aula de tango', 100, '09/02/2023')], treinos = []))
+    # Inicio pela tela de login e rodo o app.
+    root = tk.Tk()
+    app = LoginScreen(root)
+    root.mainloop()
 
     with open('users.bin', 'wb') as f:
         pickle.dump(list_of_students, f)
@@ -515,14 +752,15 @@ if __name__ == '__main__':
 
     with open('plans.bin', 'wb')  as f:
         pickle.dump(list_of_plans, f)
-        
+
     with open('classes.bin', 'wb')  as f:
         pickle.dump(list_of_classes, f)
-    
-    # Inicio pela tela de login e rodo o app.
-    root = tk.Tk()
-    app = LoginScreen(root)
-    root.mainloop()
+
+    with open('trains.bin', 'wb')  as f:
+        pickle.dump(list_of_trains, f)
+
+# %%
+
 
 # %%
 
